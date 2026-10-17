@@ -13,18 +13,26 @@ class RateLimited(Exception):
 
 
 class RateLimiter:
-    def __init__(self, per_minute: int):
+    def __init__(self, per_minute: int, trust_proxy: bool = False, proxy_hops: int = 1):
         self.per_minute = per_minute
+        self.trust_proxy = trust_proxy
+        self.proxy_hops = max(1, proxy_hops)
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
 
-    @staticmethod
-    def client_ip(request) -> str:
-        """`request` is a fastapi.Request or gradio.Request (same attributes)."""
+    def client_ip(self, request) -> str:
+        """`request` is a fastapi.Request or gradio.Request (same attributes).
+
+        X-Forwarded-For is a list the client can pre-fill with anything; each proxy
+        appends the address it saw. So it is only used behind a trusted proxy, and then
+        we take the entry added by our own proxy (counted from the right), never the
+        first one, which a visitor could fake to dodge the limit."""
         headers = getattr(request, "headers", None) or {}
-        fwd = headers.get("x-forwarded-for")
+        fwd = headers.get("x-forwarded-for") if self.trust_proxy else None
         if fwd:
-            return fwd.split(",")[0].strip()
+            hops = [h.strip() for h in fwd.split(",") if h.strip()]
+            if hops:
+                return hops[-min(self.proxy_hops, len(hops))]
         client = getattr(request, "client", None)
         return getattr(client, "host", None) or "unknown"
 

@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     session_ttl_minutes: int = 60
     max_sessions: int = 200
     rate_limit_per_minute: int = 30
+    trust_proxy: bool = False  # true behind Hugging Face / Render, so X-Forwarded-For is used
+    proxy_hops: int = 1  # how many trusted proxies append to X-Forwarded-For
 
     # --- Server ---
     cors_origins: str = ""  # comma separated; empty = same-origin only

@@ -6,6 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=7860 \
+    TRUST_PROXY=true \
     FASTEMBED_CACHE_PATH=/app/.fastembed_cache
 
 # Hugging Face Spaces runs containers as uid 1000

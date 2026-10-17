@@ -79,7 +79,7 @@ OpsPilot fixes this:
 | Sample incident | One click loads a sample incident report (3 pages) and shift log (5 pages). |
 | REST API | The same features over HTTP at `/api/...`, with interactive docs at `/docs`. |
 | Privacy | PDFs are processed in memory only and deleted after 60 minutes. Nothing is written to disk. |
-| Production basics | Input validation, upload limits, per-visitor rate limiting, health check, Docker, CI, 38 tests. |
+| Production basics | Input validation, upload limits, per-visitor rate limiting, health check, Docker, CI, 63 tests. |
 
 ---
 
@@ -102,7 +102,7 @@ Everything below is free and open source, or a free tier.
 | **Settings** | [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | 2.16 | Reads `.env` / environment variables |
 | **Validation** | [Pydantic](https://docs.pydantic.dev) | 2 | API request/response models |
 | **Sample PDFs** | [ReportLab](https://www.reportlab.com/opensource/) | 5.0 | Generates the sample incident PDFs (dev only) |
-| **Testing** | [pytest](https://pytest.org) | 9.1 | 38 offline tests |
+| **Testing** | [pytest](https://pytest.org) | 9.1 | 63 offline tests |
 | **Lint / format** | [Ruff](https://docs.astral.sh/ruff/) | 0.17 | Code style |
 | **Container** | Docker (python:3.11-slim) | – | Production image |
 | **CI/CD** | GitHub Actions | – | Lint, test, Docker build; optional auto-deploy |
@@ -378,7 +378,7 @@ opspilot/
 │   │   ├── schemas.py         API data models
 │   │   ├── config.py          all settings
 │   │   └── sample_data/       sample incident PDFs
-│   └── tests/                 38 tests (agent, RAG, text, API)
+│   └── tests/                 63 tests (agent, RAG, LLM client, rate limit, text, API)
 ├── scripts/
 │   ├── generate_samples.py    rebuilds the sample PDFs
 │   └── deploy_to_hf.sh        deploys to a Hugging Face Space
@@ -448,7 +448,7 @@ Skip this step to run in quote mode (no agent).
 
 - **Press F5** (Run and Debug → *OpsPilot: run server*), **or** run in the terminal:
   ```bash
-  uvicorn app.main:app --app-dir backend --reload --port 8000
+  uvicorn app.main:app --app-dir backend --reload --port 8000 --no-proxy-headers
   ```
 
 Open **http://localhost:8000**. The first start downloads the 70 MB embedding model once.
@@ -539,6 +539,8 @@ Set in `.env` locally, or as environment variables / secrets on your host. All a
 | `SESSION_TTL_MINUTES` | `60` | When uploaded PDFs are deleted from memory |
 | `MAX_SESSIONS` | `200` | Sessions kept at once |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Uploads + questions per visitor per minute |
+| `TRUST_PROXY` | `false` (`true` in Docker) | Read the visitor's address from the proxy's `X-Forwarded-For` entry. Turn on only behind a real proxy (Hugging Face, Render, a tunnel). |
+| `PROXY_HOPS` | `1` | How many trusted proxies add to `X-Forwarded-For` |
 | `CORS_ORIGINS` | *(empty)* | Only if another website calls the API |
 | `LOG_LEVEL` | `INFO` | `DEBUG` for more detail |
 
@@ -598,7 +600,7 @@ in the PDFs. Errors return `{"detail": "..."}` with `400`, `404`, `413`, `415`, 
 ## 15. Testing and code quality
 
 ```bash
-pytest -q                               # 38 tests
+pytest -q                               # 63 tests
 ruff check . && ruff format --check .   # lint and formatting
 ```
 
@@ -608,6 +610,8 @@ ruff check . && ruff format --check .   # lint and formatting
 | `test_rag.py` | Quote mode, refusals, timeline order, single-shot citations, LLM failure fallback, summaries |
 | `test_text.py` | Tokenising, stemming, synonyms, sentence splitting, chunking |
 | `test_api.py` | Upload → ask → summary → delete, real PDF upload, duplicate names, invalid files, validation, Gradio served at `/` |
+| `test_llm.py` | Retries on rate limits and overloaded models, retry on malformed tool calls, short user-facing errors, API key never leaked |
+| `test_rate_limit.py` | Per-visitor limit, faked `X-Forwarded-For` headers can't bypass it |
 
 Tests run **offline**: a scripted fake LLM plays the agent's tool calls, so no API key or network is needed. GitHub
 Actions runs the same checks on every push, then builds the Docker image and checks `/api/health`.

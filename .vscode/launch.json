@@ -6,7 +6,7 @@
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
-      "args": ["app.main:app", "--app-dir", "backend", "--reload", "--port", "8000"],
+      "args": ["app.main:app", "--app-dir", "backend", "--reload", "--port", "8000", "--no-proxy-headers"],
       "envFile": "${workspaceFolder}/.env",
       "justMyCode": true
     },

@@ -4,7 +4,7 @@ install:
 	python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 run:
-	.venv/bin/uvicorn app.main:app --app-dir backend --reload --port 8000
+	.venv/bin/uvicorn app.main:app --app-dir backend --reload --port 8000 --no-proxy-headers
 
 test:
 	.venv/bin/pytest -q

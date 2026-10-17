@@ -27,7 +27,7 @@ logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s 
 log = logging.getLogger("opspilot")
 
 store = SessionStore(settings.session_ttl_minutes * 60, settings.max_sessions)
-limiter = RateLimiter(settings.rate_limit_per_minute)
+limiter = RateLimiter(settings.rate_limit_per_minute, settings.trust_proxy, settings.proxy_hops)
 llm = LLMClient(settings)
 
 

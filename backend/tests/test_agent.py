@@ -40,7 +40,7 @@ class ScriptedLLM:
         self.calls = []
 
     async def complete(self, messages, tools=None, tool_choice="auto", json_mode=False):
-        self.calls.append({"messages": list(messages), "tool_choice": tool_choice})
+        self.calls.append({"messages": list(messages), "tool_choice": tool_choice, "tools": tools})
         step = self.script.pop(0)
         if isinstance(step, Exception):
             raise step
@@ -137,7 +137,9 @@ def test_agent_is_forced_to_answer_after_max_steps(sample_session):
     llm = ScriptedLLM(loop + [answer_citing("incident_report_INC-1042.pdf p.2")])
     ans = final(collect(llm, sample_session))
     assert ans.found
-    assert llm.calls[-1]["tool_choice"] == "none"
+    last_call = llm.calls[-1]
+    assert last_call["tools"] is None  # no tools offered on the last round
+    assert "used all your tool calls" in last_call["messages"][-1]["content"]
 
 
 def test_ask_falls_back_when_tool_calling_breaks(sample_session):
@@ -198,3 +200,23 @@ def test_citation_formats_from_different_models(cite):
     text = f"It failed at 02:10 {cite}."
     assert _cited_ids(text, reg)[0] == "S1"
     assert _strip_citations(text) == "It failed at 02:10."
+
+
+def test_bad_tool_call_after_rounds_used_up_ends_as_not_found(sample_session):
+    loop = [
+        call("search_documents", f'{{"query": "on-call {i}"}}', cid=f"c{i}") for i in range(SETTINGS.agent_max_steps)
+    ]
+    llm = ScriptedLLM(loop + [ToolCallError("bad tool call")])
+    ans = asyncio.run(ask_once("Who was the on-call engineer?", sample_session, llm, SETTINGS))
+    assert ans.mode == "agent" and not ans.found and ans.notice is None
+
+
+def test_search_accepts_null_file_meaning_all_files(sample_session):
+    from app.agent import TOOL_SPECS
+
+    file_schema = TOOL_SPECS[0]["function"]["parameters"]["properties"]["file"]
+    assert "null" in file_schema["type"]
+    step, result = Toolbox(sample_session, SourceRegistry(), SETTINGS).run(
+        "search_documents", '{"query": "job failed", "file": null}'
+    )
+    assert "incident_report_INC-1042.pdf p.2" in result

@@ -11,8 +11,8 @@
     {
       "label": "Run OpsPilot",
       "type": "shell",
-      "command": ".venv/bin/uvicorn app.main:app --app-dir backend --reload --port 8000",
-      "windows": { "command": ".venv\\Scripts\\uvicorn app.main:app --app-dir backend --reload --port 8000" },
+      "command": ".venv/bin/uvicorn app.main:app --app-dir backend --reload --port 8000 --no-proxy-headers",
+      "windows": { "command": ".venv\\Scripts\\uvicorn app.main:app --app-dir backend --reload --port 8000 --no-proxy-headers" },
       "isBackground": true,
       "problemMatcher": [],
       "group": { "kind": "build", "isDefault": true }

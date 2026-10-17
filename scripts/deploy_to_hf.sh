@@ -23,8 +23,10 @@ cat "$ROOT/deploy/hf_space_header.md" "$ROOT/README.md" > "$TMP/README.md"
 cd "$TMP"
 git init -q -b main
 git add -A
-git -c user.name="opspilot-deploy" -c user.email="deploy@users.noreply.github.com" \
-  commit -q -m "Deploy $(git -C "$ROOT" rev-parse --short HEAD)"
+# Commit as the repo owner (same name/email as your GitHub commits)
+NAME="$(git -C "$ROOT" config user.name || echo "opspilot-deploy")"
+EMAIL="$(git -C "$ROOT" config user.email || echo "deploy@users.noreply.github.com")"
+git -c user.name="$NAME" -c user.email="$EMAIL" commit -q -m "Deploy $(git -C "$ROOT" rev-parse --short HEAD)"
 
 if [ -n "${HF_TOKEN:-}" ]; then
   URL="https://user:${HF_TOKEN}@huggingface.co/spaces/${SPACE}"

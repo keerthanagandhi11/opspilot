@@ -21,7 +21,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from .config import Settings
-from .llm import LLMClient, LLMError, RateLimitError
+from .llm import LLMClient, LLMError, RateLimitError, ToolCallError
 from .rag import (
     DENSE_MIN,
     NOT_FOUND_TEXT,
@@ -49,6 +49,11 @@ How to work:
 4. If the documents do not contain the answer after searching, reply with exactly: NOT_FOUND
 Never use outside knowledge and never guess."""
 
+FINAL_ANSWER_NUDGE = (
+    "You have used all your tool calls. Answer now using only the tool results above, citing source ids "
+    "like [S1]. If they do not contain the answer, reply with exactly: NOT_FOUND"
+)
+
 VERIFY_SYSTEM = """You check whether an answer is fully supported by source passages.
 Return JSON: {"supported": true or false, "problem": "short description of the unsupported claim, or empty"}.
 Rephrasing is fine. Any time, name, number, cause or action that is not in the sources is unsupported."""
@@ -63,7 +68,12 @@ TOOL_SPECS = [
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "What to look for, in a few words"},
-                    "file": {"type": "string", "description": "Only if the user named one document: its file name"},
+                    # null allowed: models often send "file": null meaning "all files", and
+                    # providers with strict schema checks (Groq) reject the call otherwise.
+                    "file": {
+                        "type": ["string", "null"],
+                        "description": "Only if the user named one document: its file name",
+                    },
                 },
                 "required": ["query"],
             },
@@ -257,6 +267,7 @@ async def run_agent(
     ]
     steps: list[Step] = []
     cite_retry = verify_retry = 0
+    final_nudge_sent = False
     notice = None
 
     def emit(step: Step) -> Step:
@@ -265,7 +276,20 @@ async def run_agent(
 
     for turn in range(settings.agent_max_steps + 3):
         out_of_steps = turn >= settings.agent_max_steps
-        msg = await llm.complete(messages, tools=TOOL_SPECS, tool_choice="none" if out_of_steps else "auto")
+        if out_of_steps and not final_nudge_sent:
+            # Some models (e.g. gpt-oss) still try to call a tool when tool_choice="none",
+            # which the provider rejects. Leaving the tools out and saying so plainly works.
+            final_nudge_sent = True
+            messages.append({"role": "user", "content": FINAL_ANSWER_NUDGE})
+        try:
+            msg = await llm.complete(messages, tools=None if out_of_steps else TOOL_SPECS)
+        except ToolCallError:
+            if not out_of_steps:
+                raise  # let ask() fall back to single-shot RAG
+            # Rounds are used up and the model still wants to search: it has no supported answer.
+            yield emit(Step("check", "Stopped: no supported answer after all searches"))
+            yield Answer(NOT_FOUND_TEXT, False, "agent", steps=steps)
+            return
         calls = msg.get("tool_calls") or []
 
         if calls and not out_of_steps:
