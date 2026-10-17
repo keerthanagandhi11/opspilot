@@ -24,8 +24,8 @@ cd "$TMP"
 git init -q -b main
 git add -A
 # Commit as the repo owner (same name/email as your GitHub commits)
-NAME="$(git -C "$ROOT" config user.name || echo "opspilot-deploy")"
-EMAIL="$(git -C "$ROOT" config user.email || echo "deploy@users.noreply.github.com")"
+NAME="$(git -C "$ROOT" config user.name || git -C "$ROOT" log -1 --format=%an)"
+EMAIL="$(git -C "$ROOT" config user.email || git -C "$ROOT" log -1 --format=%ae)"
 git -c user.name="$NAME" -c user.email="$EMAIL" commit -q -m "Deploy $(git -C "$ROOT" rev-parse --short HEAD)"
 
 if [ -n "${HF_TOKEN:-}" ]; then
