@@ -138,6 +138,9 @@ class LLMClient:
         if r.status_code >= 400:
             # Full provider detail goes to the server log only; users get a short message.
             log.warning("LLM request returned HTTP %s: %s", r.status_code, self._provider_error(r))
+            if r.status_code in (401, 403):
+                log.error("The AI provider rejected the API key (HTTP %s). Check LLM_API_KEY.", r.status_code)
+                raise LLMError("The AI service isn't configured correctly (the API key was rejected).")
             raise LLMError(f"The AI provider returned an error (HTTP {r.status_code}).")
         try:
             choice = r.json()["choices"][0]

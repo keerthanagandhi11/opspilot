@@ -1,8 +1,10 @@
 """Application settings, read from environment variables (or a .env file)."""
 
+import re
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -45,6 +47,20 @@ class Settings(BaseSettings):
     # --- Server ---
     cors_origins: str = ""  # comma separated; empty = same-origin only
     log_level: str = "INFO"
+
+    @field_validator("llm_api_key", "llm_model", "llm_base_url", mode="before")
+    @classmethod
+    def _clean_pasted_value(cls, value, info):
+        """Keys pasted into a host's dashboard often pick up a trailing space or newline,
+        surrounding quotes, or the "NAME=" prefix copied from .env; any of these makes the
+        provider reject the key (HTTP 401)."""
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        value = re.sub(rf"^{info.field_name}\s*=\s*", "", value, flags=re.IGNORECASE)
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1].strip()
+        return value
 
     @property
     def llm_enabled(self) -> bool:

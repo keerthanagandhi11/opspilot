@@ -57,7 +57,7 @@ def test_provider_errors_are_short_and_never_leak_the_key():
     llm, _ = client([httpx.Response(401, json={"error": {"message": "bad key sk-secret-key"}})])
     with pytest.raises(LLMError) as err:
         asyncio.run(llm.chat("s", "u"))
-    assert str(err.value) == "The AI provider returned an error (HTTP 401)."
+    assert "API key was rejected" in str(err.value)
     assert "sk-secret-key" not in llm._provider_error(httpx.Response(401, text="bad key sk-secret-key"))
 
 
@@ -101,3 +101,24 @@ def test_groq_parsing_failed_is_retried_once():
     bad = httpx.Response(400, json={"error": {"message": "Parsing failed.", "failed_generation": "..."}})
     llm, calls = client([bad, httpx.Response(200, json=OK)])
     assert asyncio.run(llm.chat("s", "u")) == "hi" and len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    "pasted",
+    [
+        "gsk_abc123",
+        "  gsk_abc123\n",
+        '"gsk_abc123"',
+        "'gsk_abc123' ",
+        "LLM_API_KEY=gsk_abc123",
+        "llm_api_key = gsk_abc123",
+    ],
+)
+def test_pasted_api_key_is_cleaned(pasted):
+    assert Settings(llm_api_key=pasted).llm_api_key == "gsk_abc123"
+
+
+def test_rejected_key_gives_clear_message():
+    llm, _ = client([httpx.Response(401, json={"error": {"message": "Invalid API Key"}})])
+    with pytest.raises(LLMError, match="API key was rejected"):
+        asyncio.run(llm.chat("s", "u"))
