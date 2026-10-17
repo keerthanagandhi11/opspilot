@@ -21,7 +21,7 @@ COPY scripts/generate_samples.py ./scripts/
 
 # Hugging Face deploys leave out the binary sample PDFs, so rebuild them if missing
 RUN if ! ls backend/app/sample_data/*.pdf >/dev/null 2>&1; then \
-      pip install reportlab==5.0.1 && python scripts/generate_samples.py && pip uninstall -y reportlab; \
+      python scripts/generate_samples.py; \
     fi
 
 # Bake the embedding model into the image so cold starts don't download it

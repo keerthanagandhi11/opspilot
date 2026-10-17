@@ -10,3 +10,5 @@ pydantic-settings==2.16.0
 # Local embeddings (ONNX, CPU-only, no PyTorch). Optional: the app falls back to
 # keyword search if this is missing or ENABLE_EMBEDDINGS=false.
 fastembed==0.9.0
+# Builds the sample incident PDFs on first start (Hugging Face Spaces can't receive them as files)
+reportlab==5.0.1

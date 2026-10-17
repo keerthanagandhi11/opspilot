@@ -106,7 +106,7 @@ Everything below is free and open source, or a free tier.
 | **Lint / format** | [Ruff](https://docs.astral.sh/ruff/) | 0.17 | Code style |
 | **Container** | Docker (python:3.11-slim) | – | Production image |
 | **CI/CD** | GitHub Actions | – | Lint, test, Docker build; optional auto-deploy |
-| **Hosting** | [Hugging Face Spaces](https://huggingface.co/spaces) (Docker, free CPU) or [Render](https://render.com) free plan | – | Public URL |
+| **Hosting** | [Hugging Face Spaces](https://huggingface.co/spaces) (Gradio SDK, free CPU Basic) or [Render](https://render.com) free plan | – | Public URL |
 | **Editor** | VS Code (Python, Debugpy, Ruff extensions) | – | Run/debug configs included in `.vscode/` |
 
 ---
@@ -327,7 +327,7 @@ pipeline and a plain JavaScript page. Version 2 (this one) moved the interface t
 | LLM | gpt-oss-120b on Groq | Free, strong at tool calling, fast |
 | Retrieval | BM25 + bge-small + RRF | Exact terms and paraphrases both work; runs on CPU |
 | Storage | In memory, sessions expire | Privacy and zero database cost |
-| Hosting | Docker on Hugging Face Spaces | Free public HTTPS URL |
+| Hosting | Gradio Space on Hugging Face (free CPU Basic) | Free public HTTPS URL; Docker image kept for other hosts |
 
 ### 8.3 Build order
 
@@ -385,7 +385,8 @@ opspilot/
 ├── deploy/hf_space_header.md  Space settings added to the README on deploy
 ├── .github/workflows/         CI (lint + tests + Docker) and optional HF auto-deploy
 ├── .vscode/                   run/debug configs, tasks, recommended extensions
-├── Dockerfile                 production container
+├── app.py                     start-up file for a Hugging Face Gradio Space
+├── Dockerfile                 production container (Render, any Docker host)
 ├── render.yaml                one-click deploy on Render
 ├── Makefile                   make install / run / test / lint
 ├── requirements.txt           runtime dependencies
@@ -470,7 +471,7 @@ The REST API docs are at **http://localhost:8000/docs**.
 ### Option A: Hugging Face Spaces (recommended)
 
 1. Sign up at https://huggingface.co.
-2. Avatar → **New Space**. Name `opspilot`, SDK **Docker** → **Blank**, hardware **CPU basic (free)**, visibility
+2. Avatar → **New Space**. Name `opspilot`, SDK **Gradio** → **Blank**, hardware **CPU basic (free)**, visibility
    **Public** → **Create Space**.
 3. Avatar → **Settings → Access Tokens → Create new token** → type **Write** → copy it.
 4. From the project folder (Git must have at least one commit):
@@ -482,7 +483,7 @@ The REST API docs are at **http://localhost:8000/docs**.
 6. After the build (3–5 minutes) your public link is **`https://<your-hf-username>-opspilot.hf.space`**.
 
 **Why the script?** Hugging Face needs a settings header at the top of `README.md` and rejects binary files (the
-sample PDFs) unless they use Git LFS. The script adds the header and leaves out the PDFs; the Dockerfile rebuilds them.
+sample PDFs) unless they use Git LFS. The script adds the header and leaves out the PDFs; `app.py` rebuilds them on first start.
 
 **Auto-deploy on every push:** in your GitHub repo, open **Settings → Secrets and variables → Actions**. Add the
 secret `HF_TOKEN` and the variable `HF_SPACE` (`<your-hf-username>/opspilot`).
