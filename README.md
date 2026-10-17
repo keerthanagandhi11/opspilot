@@ -13,7 +13,7 @@ the cited pages before showing it. You can watch every step in the chat.
 
 | | |
 |---|---|
-| **Live demo** | `https://opspilot-xxxx.onrender.com` (see [Deploy a public URL](#11-deploy-a-public-url-free)) |
+| **Live demo** | **https://opspilot-7mqm.onrender.com** (free plan: the first visit after 15 idle minutes takes about a minute to wake up) |
 | **User interface** | **Gradio 6** (chat UI with live, collapsible agent steps) |
 | **AI model (LLM)** | **OpenAI gpt-oss-120b** (`openai/gpt-oss-120b`), open weights, on the **Groq** free tier, with tool calling |
 | **Embedding model** | **BAAI bge-small-en-v1.5**, running locally (free, no API) |
@@ -544,7 +544,7 @@ Set in `.env` locally, or as environment variables / secrets on your host. All a
 | `SESSION_TTL_MINUTES` | `60` | When uploaded PDFs are deleted from memory |
 | `MAX_SESSIONS` | `200` | Sessions kept at once |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Uploads + questions per visitor per minute |
-| `TRUST_PROXY` | `false` (`true` in Docker) | Read the visitor's address from the proxy's `X-Forwarded-For` entry. Turn on only behind a real proxy (Hugging Face, Render, a tunnel). |
+| `TRUST_PROXY` | `false` (`true` in Docker) | Read the visitor's address from the proxy: Cloudflare's `CF-Connecting-IP` if present (Render), otherwise the proxy's `X-Forwarded-For` entry. Turn on only behind a real proxy. |
 | `PROXY_HOPS` | `1` | How many trusted proxies add to `X-Forwarded-For` |
 | `CORS_ORIGINS` | *(empty)* | Only if another website calls the API |
 | `LOG_LEVEL` | `INFO` | `DEBUG` for more detail |
