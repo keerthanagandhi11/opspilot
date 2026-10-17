@@ -40,8 +40,10 @@ Loaded documents: {files}
 
 How to work:
 1. Plan: split multi-part questions and look up each part.
-2. Use the tools. search_documents finds passages; if a search misses, try other words.
+2. Use the tools. search_documents finds passages; if a search misses, try other words once.
    read_page gives a whole page for context. find_timeline lists timestamped events.
+   Use as few tool calls as you need: if two different searches find nothing relevant, stop.
+   Search all files (leave out `file`) unless the user asks about one specific document.
 3. Answer ONLY from tool results, in 1-5 short sentences (a timeline may be a short list).
    Keep exact times, job names and codes. Cite every fact with its source id, e.g. [S2].
 4. If the documents do not contain the answer after searching, reply with exactly: NOT_FOUND
@@ -61,7 +63,7 @@ TOOL_SPECS = [
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "What to look for, in a few words"},
-                    "file": {"type": "string", "description": "Optional: only search this file name"},
+                    "file": {"type": "string", "description": "Only if the user named one document: its file name"},
                 },
                 "required": ["query"],
             },
@@ -100,7 +102,11 @@ TOOL_SPECS = [
     },
 ]
 
-_CITE_RE = re.compile(r"\[(S\d+(?:\s*,\s*S\d+)*)\]")
+# Models format citations differently: [S1], [ S1 ], [S1, S2], [S1; S2], 【S1】 (gpt-oss style).
+_CITE_RE = re.compile(r"[\[【]\s*(S\d+(?:\s*[,;]\s*S\d+)*)\s*[\]】]")
+_ODD_SPACES = re.compile(r"[\u00a0\u2007\u202f\u2009]")
+SEARCH_SNIPPET_CHARS = 500  # per passage; keeps each agent turn small for free-tier token limits
+READ_PAGE_CHARS = 2500
 
 
 @dataclass
@@ -181,7 +187,7 @@ class Toolbox:
         lines, labels = [], []
         for h in hits:
             sid = self.reg.add(h.chunk.file, h.chunk.page, h.chunk.text)
-            lines.append(f"[{sid}] {h.chunk.label}\n{h.chunk.text[:700]}")
+            lines.append(f"[{sid}] {h.chunk.label}\n{h.chunk.text[:SEARCH_SNIPPET_CHARS]}")
             labels.append(h.chunk.label)
         return Step("search", title, "Found: " + ", ".join(dict.fromkeys(labels))), "\n\n".join(lines)
 
@@ -197,7 +203,7 @@ class Toolbox:
                 f"Error: no such page. Files: {names}"
             )
         sid = self.reg.add(file, page, text)
-        return Step("read", f"Read {file} p.{page}"), f"[{sid}] {file} p.{page}\n{text[:4000]}"
+        return Step("read", f"Read {file} p.{page}"), f"[{sid}] {file} p.{page}\n{text[:READ_PAGE_CHARS]}"
 
     def find_timeline(self) -> tuple[Step, str]:
         events = timestamped_events(self.s.chunks)
@@ -219,13 +225,14 @@ class Toolbox:
 def _cited_ids(text: str, reg: SourceRegistry) -> list[str]:
     ids: list[str] = []
     for group in _CITE_RE.findall(text):
-        for sid in (x.strip() for x in group.split(",")):
+        for sid in (x.strip() for x in re.split(r"[,;]", group)):
             if sid in reg and sid not in ids:
                 ids.append(sid)
     return ids
 
 
 def _strip_citations(text: str) -> str:
+    text = _ODD_SPACES.sub(" ", text)
     text = re.sub(r"\s*" + _CITE_RE.pattern, "", text)
     return re.sub(r"[ \t]+([.,;:])", r"\1", text).strip()
 

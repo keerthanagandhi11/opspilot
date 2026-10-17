@@ -186,3 +186,15 @@ def test_rate_limit_skips_straight_to_quote_mode(sample_session):
     assert ans.mode == "extractive" and "shift lead" in ans.text
     assert ans.notice == RATE_LIMIT_MESSAGE
     assert len(llm.calls) == 1  # no second LLM call after the limit
+
+
+@pytest.mark.parametrize("cite", ["[S1]", "[ S1 ]", "【S1】", "[S1; S2]", "[S1, S2]"])
+def test_citation_formats_from_different_models(cite):
+    from app.agent import _cited_ids, _strip_citations
+
+    reg = SourceRegistry()
+    reg.add("a.pdf", 1, "x")
+    reg.add("a.pdf", 2, "y")
+    text = f"It failed at 02:10 {cite}."
+    assert _cited_ids(text, reg)[0] == "S1"
+    assert _strip_citations(text) == "It failed at 02:10."

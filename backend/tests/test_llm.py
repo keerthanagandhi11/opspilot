@@ -79,3 +79,25 @@ def test_overloaded_twice_gives_short_error(monkeypatch):
     with pytest.raises(LLMError, match=r"HTTP 503"):
         asyncio.run(llm.chat("s", "u"))
     assert len(calls) == 2
+
+
+def test_invalid_tool_call_is_retried_once():
+    bad = httpx.Response(400, json={"error": {"code": "tool_use_failed", "message": "bad call"}})
+    llm, calls = client([bad, httpx.Response(200, json=OK)])
+    assert asyncio.run(llm.chat("s", "u")) == "hi" and len(calls) == 2
+
+
+def test_invalid_tool_call_twice_raises_tool_call_error():
+    from app.llm import ToolCallError
+
+    bad = {"error": {"code": "tool_use_failed"}}
+    llm, calls = client([httpx.Response(400, json=bad), httpx.Response(400, json=bad)])
+    with pytest.raises(ToolCallError):
+        asyncio.run(llm.chat("s", "u"))
+    assert len(calls) == 2
+
+
+def test_groq_parsing_failed_is_retried_once():
+    bad = httpx.Response(400, json={"error": {"message": "Parsing failed.", "failed_generation": "..."}})
+    llm, calls = client([bad, httpx.Response(200, json=OK)])
+    assert asyncio.run(llm.chat("s", "u")) == "hi" and len(calls) == 2

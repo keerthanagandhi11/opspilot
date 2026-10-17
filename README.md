@@ -15,7 +15,7 @@ the cited pages before showing it. You can watch every step in the chat.
 |---|---|
 | **Live demo** | `https://<your-hf-username>-opspilot.hf.space` (see [Deploy a public URL](#11-deploy-a-public-url-free)) |
 | **User interface** | **Gradio 6** (chat UI with live, collapsible agent steps) |
-| **AI model (LLM)** | **Meta Llama 3.3 70B** (`llama-3.3-70b-versatile`) on the **Groq** free tier, with tool calling |
+| **AI model (LLM)** | **OpenAI gpt-oss-120b** (`openai/gpt-oss-120b`), open weights, on the **Groq** free tier, with tool calling |
 | **Embedding model** | **BAAI bge-small-en-v1.5**, running locally (free, no API) |
 | **RAG style** | Agentic: plan → tool calls → answer with citations → self-check → revise |
 | **Cost** | **0**. Every part is open source or a free tier. No credit card needed anywhere. |
@@ -92,7 +92,7 @@ Everything below is free and open source, or a free tier.
 | **Language** | Python | 3.11 (3.10+ works) | Whole project |
 | **User interface** | [Gradio](https://www.gradio.app) | 6.30 | Chat UI, file upload, agent-step display |
 | **Web server / API** | [FastAPI](https://fastapi.tiangolo.com) + [Uvicorn](https://www.uvicorn.org) | 0.143 / 0.54 | REST API, hosts the Gradio app at `/` |
-| **LLM** | Meta **Llama 3.3 70B** via [Groq](https://console.groq.com) | `llama-3.3-70b-versatile` | Agent reasoning, tool calling, answers, self-check, summary |
+| **LLM** | OpenAI **gpt-oss-120b** (open weights) via [Groq](https://console.groq.com) | `openai/gpt-oss-120b` | Agent reasoning, tool calling, answers, self-check, summary |
 | **LLM client** | [httpx](https://www.python-httpx.org) (OpenAI-compatible REST) | 0.28 | Calls Groq, or any OpenAI-compatible provider |
 | **Agent framework** | Custom tool-calling loop (`backend/app/agent.py`) | – | Plan → act → answer → verify; no heavy framework needed |
 | **Embeddings** | **BAAI bge-small-en-v1.5** via [fastembed](https://github.com/qdrant/fastembed) (ONNX Runtime) | 0.9 | Meaning-based search, on CPU |
@@ -113,31 +113,41 @@ Everything below is free and open source, or a free tier.
 
 ## 4. Which AI models are used (and why)
 
-### 4.1 The LLM (the agent's brain): Meta Llama 3.3 70B on Groq
+### 4.1 The LLM (the agent's brain): OpenAI gpt-oss-120b on Groq
 
 | | |
 |---|---|
-| **Model** | Llama 3.3 70B Instruct, made by Meta, open weights |
-| **Model ID** | `llama-3.3-70b-versatile` |
+| **Model** | gpt-oss-120b, an open-weight reasoning model released by OpenAI (Apache 2.0 licence) |
+| **Model ID** | `openai/gpt-oss-120b` |
 | **Provider** | [Groq](https://console.groq.com) (runs it on fast LPU hardware) |
-| **Cost** | Free tier, no credit card. The free tier has per-minute and per-day limits; see your account's [limits page](https://console.groq.com/settings/limits). |
+| **Cost** | Free tier, no credit card. The free tier limits requests and tokens per minute and per day (for example 8,000 tokens per minute at the time of testing); see your account's [limits page](https://console.groq.com/settings/limits). |
 | **Context window** | 131,072 tokens |
 | **Used for** | (1) choosing and calling tools, (2) writing the cited answer, (3) self-checking the answer, (4) writing the incident summary as JSON |
-| **Settings** | `temperature = 0.1`, `max_tokens = 1500`, up to 5 tool-calling rounds per question |
+| **Settings** | `temperature = 0.1`, `max_tokens = 1500` (room for its hidden reasoning), up to 3 tool-calling rounds per question |
 | **Where in code** | [`backend/app/llm.py`](backend/app/llm.py) (API client), [`backend/app/agent.py`](backend/app/agent.py) (agent prompts and loop) |
 
-**Why this model?** It is one of the strongest open-weight models on a genuinely free API. It supports **tool calling**,
-which the agent needs, and follows instructions well (important for "cite your sources" and "say NOT_FOUND"). Groq serves
-it very fast, so a multi-step agent run still finishes in a few seconds.
+**Why this model?**
+
+- **Built for tool calling**, which the agent depends on: it picks the right tool and arguments reliably.
+- **Follows grounding rules well**: it cites sources and says `NOT_FOUND` instead of guessing.
+- **Fast on Groq**: a typical answer (one search plus the self-check) takes about 2–3 seconds.
+- **Free** with a generous context window.
+
+This project first used Meta's Llama 3.3 70B on Groq. It no longer appeared in Groq's model list for the project's key
+when tested, so the default moved to gpt-oss-120b.
+
+**Free-tier tips.** Each question makes about 2–4 LLM calls. If you hit the per-minute limit, OpsPilot waits briefly
+and retries, and otherwise answers in quote mode. To use fewer tokens, set `AGENT_VERIFY=false` or switch to
+`openai/gpt-oss-20b`.
 
 **Switching models.** OpsPilot uses the standard *OpenAI-compatible* chat API, so you can change provider with two
 settings in `.env`. For agent mode, the model must support tool calling.
 
 | Provider | `LLM_BASE_URL` | `LLM_MODEL` | Notes |
 |---|---|---|---|
-| **Groq** (default) | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | Free key at console.groq.com |
-| Groq, OpenAI open model | `https://api.groq.com/openai/v1` | `openai/gpt-oss-120b` | Open-weight model from OpenAI, supports tools |
-| Groq, small and fast | `https://api.groq.com/openai/v1` | `llama-3.1-8b-instant` | Higher free limits, weaker agent |
+| **Groq** (default) | `https://api.groq.com/openai/v1` | `openai/gpt-oss-120b` | Free key at console.groq.com |
+| Groq, smaller and faster | `https://api.groq.com/openai/v1` | `openai/gpt-oss-20b` | Uses fewer tokens, weaker agent |
+| Groq, Qwen | `https://api.groq.com/openai/v1` | `qwen/qwen3.8-27b` | Open-weight model from Alibaba, supports tools |
 | Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.8-flash` | Free key at aistudio.google.com |
 | OpenRouter | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.3-70b-instruct:free` | Free models, key at openrouter.ai |
 | Ollama (offline) | `http://localhost:11434/v1` | `llama3.1` | Runs on your computer; set `LLM_API_KEY=ollama` |
@@ -167,7 +177,7 @@ the search misses, the answer is wrong or empty.
 | Ability | How OpsPilot does it |
 |---|---|
 | **Plans** | Splits multi-part questions (*"why did it fail and who approved the fix?"*) and looks up each part. |
-| **Uses tools** | Chooses between 4 tools (below) and calls them as often as it needs, up to 5 rounds. |
+| **Uses tools** | Chooses between 4 tools (below) and calls them as often as it needs, up to 3 rounds. |
 | **Re-queries** | If a search returns nothing useful, it tries different words. |
 | **Reads more context** | Opens a whole page when a short passage isn't enough. |
 | **Self-checks** | A separate verifier call checks every claim against the cited pages. |
@@ -189,7 +199,7 @@ Every page the agent sees gets a stable id (`S1`, `S2`, …). The agent cites th
 ### Fallbacks (it never just breaks)
 
 ```
-Agent (Llama 3.3 70B + tools)
+Agent (gpt-oss-120b + tools)
    │  tool calling fails or LLM error
    ▼
 Single-shot RAG (search once → LLM answers with citations)
@@ -221,7 +231,7 @@ flowchart TB
         V -->|unsupported claim| P
     end
     T --> S
-    P <-->|tool calling API| LLM[Groq<br/>Llama 3.3 70B]
+    P <-->|tool calling API| LLM[Groq<br/>gpt-oss-120b]
     V <--> LLM
     AG -->|steps stream live, then answer + sources| U
 ```
@@ -314,7 +324,7 @@ pipeline and a plain JavaScript page. Version 2 (this one) moved the interface t
 | Agent | Hand-written tool-calling loop (about 100 lines) | Easy to read, test and explain; no framework lock-in; works with any OpenAI-compatible LLM |
 | Self-check | Separate verifier call with JSON output | Catches unsupported claims before the user sees them |
 | Citations | Page ids (`S1`, `S2`) assigned by the tools | The model can only cite pages it actually retrieved |
-| LLM | Llama 3.3 70B on Groq | Free, strong at tool calling, fast |
+| LLM | gpt-oss-120b on Groq | Free, strong at tool calling, fast |
 | Retrieval | BM25 + bge-small + RRF | Exact terms and paraphrases both work; runs on CPU |
 | Storage | In memory, sessions expire | Privacy and zero database cost |
 | Hosting | Docker on Hugging Face Spaces | Free public HTTPS URL |
@@ -449,7 +459,7 @@ Open **http://localhost:8000**. The first start downloads the 70 MB embedding mo
 2. Click a suggestion: *Why did the job fail?*, *Who approved the rerun?*, *Give me a timeline*, *Who was the on-call
    engineer?* (this one should say it can't find it).
 3. Expand **🧠 Agent steps** to see what the agent did, and **📎 Source passages** to see the exact text.
-4. The badge under the title shows **Agentic RAG with llama-3.3-70b-versatile** or **Quote mode**.
+4. The badge under the title shows **Agentic RAG with openai/gpt-oss-120b** or **Quote mode**.
 
 The REST API docs are at **http://localhost:8000/docs**.
 
@@ -514,11 +524,11 @@ Set in `.env` locally, or as environment variables / secrets on your host. All a
 |---|---|---|
 | `LLM_API_KEY` | *(empty)* | Empty = quote mode. A Groq (or other) key turns on the agent. |
 | `LLM_BASE_URL` | `https://api.groq.com/openai/v1` | LLM provider address |
-| `LLM_MODEL` | `llama-3.3-70b-versatile` | Model name (must support tool calling for agent mode) |
+| `LLM_MODEL` | `openai/gpt-oss-120b` | Model name (must support tool calling for agent mode) |
 | `LLM_TIMEOUT_SECONDS` | `30` | Per-call timeout |
 | `LLM_MAX_TOKENS` | `1500` | Maximum reply length per call (includes the hidden "thinking" tokens of reasoning models such as Gemini flash) |
 | `AGENT_ENABLED` | `true` | `false` = single-shot RAG instead of the agent |
-| `AGENT_MAX_STEPS` | `5` | Tool-calling rounds before the agent must answer |
+| `AGENT_MAX_STEPS` | `3` | Tool-calling rounds before the agent must answer |
 | `AGENT_VERIFY` | `true` | Run the self-check (one extra LLM call per answer) |
 | `ENABLE_EMBEDDINGS` | `true` | `false` = keyword search only |
 | `EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | Any fastembed model |
@@ -532,8 +542,8 @@ Set in `.env` locally, or as environment variables / secrets on your host. All a
 | `CORS_ORIGINS` | *(empty)* | Only if another website calls the API |
 | `LOG_LEVEL` | `INFO` | `DEBUG` for more detail |
 
-**Free-tier tip:** each agent answer uses about 3–5 LLM calls. If you hit Groq's free limits, set `AGENT_VERIFY=false`
-or `AGENT_MAX_STEPS=3`, or switch to `llama-3.1-8b-instant`.
+**Free-tier tip:** each agent answer uses about 2–4 LLM calls. If you hit Groq's free limits, set `AGENT_VERIFY=false`
+or `AGENT_MAX_STEPS=2`, or switch to `openai/gpt-oss-20b`.
 
 ---
 
@@ -655,6 +665,6 @@ Actions runs the same checks on every push, then builds the Docker image and che
 pull request.
 
 **Built with:** [Gradio](https://www.gradio.app) · [FastAPI](https://fastapi.tiangolo.com) ·
-[Meta Llama 3.3](https://www.llama.com) · [Groq](https://groq.com) ·
+[OpenAI gpt-oss](https://openai.com/index/introducing-gpt-oss/) · [Groq](https://groq.com) ·
 [BAAI bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) · [fastembed](https://github.com/qdrant/fastembed) ·
 [pypdf](https://pypdf.readthedocs.io) · [Atkinson Hyperlegible font](https://brailleinstitute.org/freefont)

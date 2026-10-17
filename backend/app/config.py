@@ -15,13 +15,13 @@ class Settings(BaseSettings):
     # --- LLM (any OpenAI-compatible chat API; Groq free tier by default) ---
     llm_api_key: str = ""
     llm_base_url: str = "https://api.groq.com/openai/v1"
-    llm_model: str = "llama-3.3-70b-versatile"
+    llm_model: str = "openai/gpt-oss-120b"
     llm_timeout_seconds: float = 30.0
     llm_max_tokens: int = 1500  # room for reasoning models (e.g. Gemini flash) that think before answering
 
     # --- Agent (agentic RAG) ---
     agent_enabled: bool = True  # false = single-shot RAG
-    agent_max_steps: int = 5  # tool-calling rounds before the agent must answer
+    agent_max_steps: int = 3  # tool-calling rounds before the agent must answer (keeps free-tier token use low)
     agent_verify: bool = True  # self-check the answer against its sources
 
     # --- Retrieval ---

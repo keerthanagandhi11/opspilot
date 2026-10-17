@@ -91,6 +91,7 @@ class LLMClient:
         tool_choice: str = "auto",
         json_mode: bool = False,
         max_tokens: int | None = None,
+        retried_tool_call: bool = False,
     ) -> dict:
         """One chat-completions call. Returns the assistant message dict, which may
         contain "tool_calls" when tools are offered (used by the agent)."""
@@ -128,9 +129,13 @@ class LLMClient:
             if attempt == 2 or wait is None or wait > MAX_RETRY_WAIT_SECONDS:
                 raise RateLimitError(RATE_LIMIT_MESSAGE)
             await asyncio.sleep(max(wait, 1.0))
+        # Groq reports malformed model output as tool_use_failed or failed_generation.
+        if r.status_code >= 400 and ("tool_use_failed" in r.text or "failed_generation" in r.text):
+            if not retried_tool_call:
+                log.warning("Model produced an invalid tool call, retrying once")
+                return await self.complete(messages, tools, tool_choice, json_mode, max_tokens, retried_tool_call=True)
+            raise ToolCallError("The model produced an invalid tool call.")
         if r.status_code >= 400:
-            if "tool_use_failed" in r.text:  # model produced a malformed tool call
-                raise ToolCallError("The model produced an invalid tool call.")
             # Full provider detail goes to the server log only; users get a short message.
             log.warning("LLM request returned HTTP %s: %s", r.status_code, self._provider_error(r))
             raise LLMError(f"The AI provider returned an error (HTTP {r.status_code}).")
