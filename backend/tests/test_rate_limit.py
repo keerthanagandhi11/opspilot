@@ -30,3 +30,19 @@ def test_behind_proxy_uses_entry_added_by_proxy():
     with pytest.raises(RateLimited):
         rl.check(req(ip="proxy", xff="fake-2, 203.0.113.7"))  # visitor changes the fake part only
     rl.check(req(ip="proxy", xff="198.51.100.4"))  # a different real visitor is allowed
+
+
+def test_behind_cloudflare_uses_cf_connecting_ip():
+    rl = RateLimiter(1, trust_proxy=True)
+    first = SimpleNamespace(client=None, headers={"cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "fake-1"})
+    second = SimpleNamespace(client=None, headers={"cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "fake-2"})
+    rl.check(first)
+    with pytest.raises(RateLimited):
+        rl.check(second)  # faking X-Forwarded-For doesn't help when Cloudflare's header is there
+
+
+def test_cf_header_ignored_without_trusted_proxy():
+    rl = RateLimiter(1)
+    rl.check(SimpleNamespace(client=SimpleNamespace(host="10.0.0.9"), headers={"cf-connecting-ip": "1.1.1.1"}))
+    with pytest.raises(RateLimited):
+        rl.check(SimpleNamespace(client=SimpleNamespace(host="10.0.0.9"), headers={"cf-connecting-ip": "2.2.2.2"}))

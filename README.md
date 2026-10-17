@@ -560,7 +560,7 @@ Interactive docs at **`/docs`**.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/health` | `{"status": "ok", "version": "2.0.1", "sessions": 0}` |
+| `GET` | `/api/health` | `{"status": "ok", "version": "2.0.2", "sessions": 0}` |
 | `GET` | `/api/config` | Whether the LLM and agent are on, model name, limits |
 | `POST` | `/api/sessions` | Upload PDFs (multipart `files`, repeatable) and/or `include_sample=true` |
 | `GET` | `/api/sessions/{id}/summary` | Incident summary |

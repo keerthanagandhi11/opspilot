@@ -1,6 +1,6 @@
 [project]
 name = "opspilot"
-version = "2.0.1"
+version = "2.0.2"
 description = "Agentic RAG for incident PDFs with a Gradio UI. Every answer cites the file and page it came from."
 readme = "README.md"
 license = { text = "MIT" }

@@ -23,16 +23,23 @@ class RateLimiter:
     def client_ip(self, request) -> str:
         """`request` is a fastapi.Request or gradio.Request (same attributes).
 
-        X-Forwarded-For is a list the client can pre-fill with anything; each proxy
-        appends the address it saw. So it is only used behind a trusted proxy, and then
-        we take the entry added by our own proxy (counted from the right), never the
-        first one, which a visitor could fake to dodge the limit."""
+        Behind a trusted proxy we look, in order, at:
+        1. CF-Connecting-IP / True-Client-IP: set by Cloudflare (in front of Render and
+           many hosts), which overwrites any value a visitor sends, so it can't be faked.
+        2. X-Forwarded-For: a list the visitor can pre-fill with anything; each proxy
+           appends the address it saw, so we count from the right, never the first entry.
+        Without a trusted proxy (local runs) the connection address is used."""
         headers = getattr(request, "headers", None) or {}
-        fwd = headers.get("x-forwarded-for") if self.trust_proxy else None
-        if fwd:
-            hops = [h.strip() for h in fwd.split(",") if h.strip()]
-            if hops:
-                return hops[-min(self.proxy_hops, len(hops))]
+        if self.trust_proxy:
+            for name in ("cf-connecting-ip", "true-client-ip"):
+                value = (headers.get(name) or "").strip()
+                if value:
+                    return value
+            fwd = headers.get("x-forwarded-for")
+            if fwd:
+                hops = [h.strip() for h in fwd.split(",") if h.strip()]
+                if hops:
+                    return hops[-min(self.proxy_hops, len(hops))]
         client = getattr(request, "client", None)
         return getattr(client, "host", None) or "unknown"
 
