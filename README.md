@@ -13,7 +13,7 @@ the cited pages before showing it. You can watch every step in the chat.
 
 | | |
 |---|---|
-| **Live demo** | `https://<your-hf-username>-opspilot.hf.space` (see [Deploy a public URL](#11-deploy-a-public-url-free)) |
+| **Live demo** | `https://opspilot-xxxx.onrender.com` (see [Deploy a public URL](#11-deploy-a-public-url-free)) |
 | **User interface** | **Gradio 6** (chat UI with live, collapsible agent steps) |
 | **AI model (LLM)** | **OpenAI gpt-oss-120b** (`openai/gpt-oss-120b`), open weights, on the **Groq** free tier, with tool calling |
 | **Embedding model** | **BAAI bge-small-en-v1.5**, running locally (free, no API) |
@@ -106,7 +106,7 @@ Everything below is free and open source, or a free tier.
 | **Lint / format** | [Ruff](https://docs.astral.sh/ruff/) | 0.17 | Code style |
 | **Container** | Docker (python:3.11-slim) | – | Production image |
 | **CI/CD** | GitHub Actions | – | Lint, test, Docker build; optional auto-deploy |
-| **Hosting** | [Hugging Face Spaces](https://huggingface.co/spaces) (Gradio SDK, free CPU Basic) or [Render](https://render.com) free plan | – | Public URL |
+| **Hosting** | [Render](https://render.com) free plan (Docker); Hugging Face Spaces if you have PRO | – | Public URL |
 | **Editor** | VS Code (Python, Debugpy, Ruff extensions) | – | Run/debug configs included in `.vscode/` |
 
 ---
@@ -327,7 +327,7 @@ pipeline and a plain JavaScript page. Version 2 (this one) moved the interface t
 | LLM | gpt-oss-120b on Groq | Free, strong at tool calling, fast |
 | Retrieval | BM25 + bge-small + RRF | Exact terms and paraphrases both work; runs on CPU |
 | Storage | In memory, sessions expire | Privacy and zero database cost |
-| Hosting | Gradio Space on Hugging Face (free CPU Basic) | Free public HTTPS URL; Docker image kept for other hosts |
+| Hosting | Docker on Render's free plan | Free public HTTPS URL, redeploys on every push |
 
 ### 8.3 Build order
 
@@ -468,30 +468,34 @@ The REST API docs are at **http://localhost:8000/docs**.
 
 ## 11. Deploy a public URL (free)
 
-### Option A: Hugging Face Spaces (recommended)
+### Option A: Render (recommended, free)
 
-1. Sign up at https://huggingface.co.
-2. Avatar → **New Space**. Name `opspilot`, SDK **Gradio** → **Blank**, hardware **CPU basic (free)**, visibility
-   **Public** → **Create Space**.
-3. Avatar → **Settings → Access Tokens → Create new token** → type **Write** → copy it.
-4. From the project folder (Git must have at least one commit):
-   ```bash
-   ./scripts/deploy_to_hf.sh <your-hf-username>/opspilot
-   ```
-   Username: your Hugging Face username. Password: paste the token.
-5. In the Space: **Settings → Variables and secrets → New secret**: `LLM_API_KEY` = your Groq key.
-6. After the build (3–5 minutes) your public link is **`https://<your-hf-username>-opspilot.hf.space`**.
+Render's free plan runs the Docker image from this repo and redeploys on every push. No credit card is needed for
+the free plan. Free services sleep after 15 minutes without visitors and take about a minute to wake up, so open the
+link shortly before a demo.
 
-**Why the script?** Hugging Face needs a settings header at the top of `README.md` and rejects binary files (the
-sample PDFs) unless they use Git LFS. The script adds the header and leaves out the PDFs; `app.py` rebuilds them on first start.
+1. Go to https://render.com → **Get Started** → **Sign up with GitHub** and allow access to the `opspilot` repo.
+2. In the dashboard: **New** → **Blueprint** → select the `opspilot` repo → **Connect**.
+3. Render reads [`render.yaml`](render.yaml) and asks for **`LLM_API_KEY`**: paste your Groq key (`gsk_...`).
+4. Click **Apply** (or **Deploy Blueprint**). The first build takes about 5–10 minutes.
+5. Your public link appears at the top of the service page: **`https://opspilot-xxxx.onrender.com`**.
 
-**Auto-deploy on every push:** in your GitHub repo, open **Settings → Secrets and variables → Actions**. Add the
-secret `HF_TOKEN` and the variable `HF_SPACE` (`<your-hf-username>/opspilot`).
+`render.yaml` sets the free plan, the Groq model, `TRUST_PROXY=true` and `ENABLE_EMBEDDINGS=false`. The free plan has
+512 MB of memory; keyword search alone uses about 160 MB, while embeddings add about 180 MB more.
 
-### Option B: Render (free plan)
+### Option B: Hugging Face Spaces (needs a paid plan)
 
-Push to GitHub, then on https://render.com: **New → Blueprint** → choose the repo (it reads `render.yaml`). Add
-`LLM_API_KEY` under **Environment**. Free services sleep after 15 minutes idle.
+Hugging Face now lists hosting Gradio and Docker Spaces as a PRO feature. If you have PRO, this repo also works as a
+Gradio Space: create a Space with SDK **Gradio** → **Blank**, add the secret `LLM_API_KEY`, then run
+`./scripts/deploy_to_hf.sh <your-hf-username>/opspilot` (use a Hugging Face **Write** token as the password). The
+script adds the Space header to the README and leaves out the sample PDFs, which `app.py` rebuilds on first start.
+For automatic deploys, add the GitHub Actions secret `HF_TOKEN` and variable `HF_SPACE`.
+
+### Why not Vercel?
+
+Vercel runs Python as short-lived serverless functions. OpsPilot needs a long-running server: uploaded PDFs live in
+memory for the whole chat, Gradio keeps a live connection open, the dependencies are larger than Vercel's function
+size limit, and PDF uploads can exceed its 4.5 MB request limit.
 
 ### Option C: Docker anywhere
 

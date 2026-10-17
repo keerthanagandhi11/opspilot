@@ -1,12 +1,23 @@
-# One-click deploy on Render's free plan: New > Blueprint > pick this repo.
+# One-click deploy on Render's free plan:
+#   Render dashboard -> New -> Blueprint -> pick this GitHub repo -> paste your Groq key.
+# Free web services sleep after 15 minutes without visitors (about a minute to wake up).
 services:
   - type: web
     name: opspilot
     runtime: docker
     plan: free
+    autoDeploy: true            # redeploy on every push to main
     healthCheckPath: /api/health
     envVars:
-      - key: PORT
-        value: "10000"
       - key: LLM_API_KEY
-        sync: false   # set it in the Render dashboard (optional)
+        sync: false             # Render asks for this value when you create the Blueprint
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: TRUST_PROXY        # Render's proxy adds the visitor's address to X-Forwarded-For
+        value: "true"
+      # The free plan has 512 MB of memory. Keyword search alone uses about 160 MB;
+      # embeddings add about 180 MB. The agent rewords searches, so keyword search works well.
+      - key: ENABLE_EMBEDDINGS
+        value: "false"
