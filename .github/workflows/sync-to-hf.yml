@@ -1,0 +1,21 @@
+# Optional: deploy every push on main to a Hugging Face Space.
+# Setup (GitHub repo -> Settings -> Secrets and variables -> Actions):
+#   secret   HF_TOKEN  = a Hugging Face write token
+#   variable HF_SPACE  = your-hf-username/opspilot
+name: Deploy to Hugging Face Spaces
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: vars.HF_SPACE != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push to Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: ./scripts/deploy_to_hf.sh "${{ vars.HF_SPACE }}"

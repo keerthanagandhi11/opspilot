@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup: create venv and install",
+      "type": "shell",
+      "command": "python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt",
+      "windows": { "command": "py -m venv .venv; .venv\\Scripts\\pip install -r requirements-dev.txt" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run OpsPilot",
+      "type": "shell",
+      "command": ".venv/bin/uvicorn app.main:app --app-dir backend --reload --port 8000",
+      "windows": { "command": ".venv\\Scripts\\uvicorn app.main:app --app-dir backend --reload --port 8000" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "Test",
+      "type": "shell",
+      "command": ".venv/bin/pytest -q",
+      "windows": { "command": ".venv\\Scripts\\pytest -q" },
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    }
+  ]
+}

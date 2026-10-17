@@ -1,0 +1,14 @@
+.venv
+venv
+.git
+.github
+.vscode
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.env
+backend/tests
+scripts/*
+!scripts/generate_samples.py
+*.md
+!README.md

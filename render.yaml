@@ -1,0 +1,12 @@
+# One-click deploy on Render's free plan: New > Blueprint > pick this repo.
+services:
+  - type: web
+    name: opspilot
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: LLM_API_KEY
+        sync: false   # set it in the Render dashboard (optional)
