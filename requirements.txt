@@ -3,6 +3,7 @@ gradio==6.30.0
 fastapi==0.143.3
 uvicorn[standard]==0.54.0
 pypdf==6.21.1
+cryptography==50.0.2  # lets pypdf open AES-encrypted PDFs
 python-multipart==0.0.32
 httpx==0.28.1
 pydantic-settings==2.16.0

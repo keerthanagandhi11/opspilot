@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.groq.com/openai/v1"
     llm_model: str = "llama-3.3-70b-versatile"
     llm_timeout_seconds: float = 30.0
-    llm_max_tokens: int = 600
+    llm_max_tokens: int = 1500  # room for reasoning models (e.g. Gemini flash) that think before answering
 
     # --- Agent (agentic RAG) ---
     agent_enabled: bool = True  # false = single-shot RAG

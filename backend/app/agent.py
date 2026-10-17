@@ -21,10 +21,17 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from .config import Settings
-from .llm import LLMClient, LLMError
-from .rag import DENSE_MIN, NOT_FOUND_TEXT, Answer, Source, answer_question, extractive_answer
+from .llm import LLMClient, LLMError, RateLimitError
+from .rag import (
+    DENSE_MIN,
+    NOT_FOUND_TEXT,
+    Answer,
+    Source,
+    answer_question,
+    extractive_answer,
+    timestamped_events,
+)
 from .sessions import Session
-from .text import split_sentences
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +101,6 @@ TOOL_SPECS = [
 ]
 
 _CITE_RE = re.compile(r"\[(S\d+(?:\s*,\s*S\d+)*)\]")
-_TIMESTAMPED = re.compile(r"^\d{1,2}:\d{2}\b")
 
 
 @dataclass
@@ -194,11 +200,7 @@ class Toolbox:
         return Step("read", f"Read {file} p.{page}"), f"[{sid}] {file} p.{page}\n{text[:4000]}"
 
     def find_timeline(self) -> tuple[Step, str]:
-        events = []
-        for c in self.s.chunks:
-            for sent in split_sentences(c.text):
-                if _TIMESTAMPED.match(sent) and all(sent != e for e, _ in events):
-                    events.append((sent, c))
+        events = timestamped_events(self.s.chunks)
         if not events:
             return Step("timeline", "Looked for a timeline", "No timestamped lines found."), (
                 "No timestamped lines found."
@@ -337,6 +339,16 @@ async def ask(question: str, session: Session, llm: LLMClient, settings: Setting
         async for item in run_agent(question, session, llm, settings):
             produced = produced or isinstance(item, Answer)
             yield item
+    except RateLimitError as exc:
+        if produced:
+            return
+        # Another LLM call would hit the same limit: answer from the PDFs directly.
+        log.warning("Agent rate limited; answering in quote mode")
+        yield Step("info", "AI limit reached, quoting the PDFs instead", str(exc))
+        hits = session.index.search(question, k=settings.top_k)
+        ans = extractive_answer(question, hits, session.chunks)
+        ans.notice = str(exc)
+        yield ans
     except LLMError as exc:
         if produced:
             return

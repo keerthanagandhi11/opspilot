@@ -123,7 +123,7 @@ Everything below is free and open source, or a free tier.
 | **Cost** | Free tier, no credit card. The free tier has per-minute and per-day limits; see your account's [limits page](https://console.groq.com/settings/limits). |
 | **Context window** | 131,072 tokens |
 | **Used for** | (1) choosing and calling tools, (2) writing the cited answer, (3) self-checking the answer, (4) writing the incident summary as JSON |
-| **Settings** | `temperature = 0.1`, `max_tokens = 600`, up to 5 tool-calling rounds per question |
+| **Settings** | `temperature = 0.1`, `max_tokens = 1500`, up to 5 tool-calling rounds per question |
 | **Where in code** | [`backend/app/llm.py`](backend/app/llm.py) (API client), [`backend/app/agent.py`](backend/app/agent.py) (agent prompts and loop) |
 
 **Why this model?** It is one of the strongest open-weight models on a genuinely free API. It supports **tool calling**,
@@ -138,7 +138,7 @@ settings in `.env`. For agent mode, the model must support tool calling.
 | **Groq** (default) | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | Free key at console.groq.com |
 | Groq, OpenAI open model | `https://api.groq.com/openai/v1` | `openai/gpt-oss-120b` | Open-weight model from OpenAI, supports tools |
 | Groq, small and fast | `https://api.groq.com/openai/v1` | `llama-3.1-8b-instant` | Higher free limits, weaker agent |
-| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` | Free key at aistudio.google.com |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.8-flash` | Free key at aistudio.google.com |
 | OpenRouter | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.3-70b-instruct:free` | Free models, key at openrouter.ai |
 | Ollama (offline) | `http://localhost:11434/v1` | `llama3.1` | Runs on your computer; set `LLM_API_KEY=ollama` |
 
@@ -516,7 +516,7 @@ Set in `.env` locally, or as environment variables / secrets on your host. All a
 | `LLM_BASE_URL` | `https://api.groq.com/openai/v1` | LLM provider address |
 | `LLM_MODEL` | `llama-3.3-70b-versatile` | Model name (must support tool calling for agent mode) |
 | `LLM_TIMEOUT_SECONDS` | `30` | Per-call timeout |
-| `LLM_MAX_TOKENS` | `600` | Maximum reply length per call |
+| `LLM_MAX_TOKENS` | `1500` | Maximum reply length per call (includes the hidden "thinking" tokens of reasoning models such as Gemini flash) |
 | `AGENT_ENABLED` | `true` | `false` = single-shot RAG instead of the agent |
 | `AGENT_MAX_STEPS` | `5` | Tool-calling rounds before the agent must answer |
 | `AGENT_VERIFY` | `true` | Run the self-check (one extra LLM call per answer) |

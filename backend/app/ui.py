@@ -40,6 +40,9 @@ CSS = """
 #summary .gap {color: #8a5a0b; background: #fbf0d9; border-radius: 8px; padding: 6px 10px; margin: 4px 0}
 .dark #summary .gap {color: #f0c36d; background: #3a2f14}
 .suggest button {font-size: 14px !important}
+.sample-row {flex-wrap: wrap !important; align-items: center !important; gap: 8px 16px !important}
+.sample-row > button {flex: 0 0 auto !important}
+.sample-note {flex: 1 1 220px !important; min-width: 0 !important}
 """
 
 
@@ -246,9 +249,9 @@ def build_ui(settings: Settings, store: SessionStore, llm: LLMClient, limiter: R
                 type="filepath",
                 height=180,
             )
-            with gr.Row(equal_height=True):
-                sample_btn = gr.Button("Use sample incident PDFs", size="md", scale=0, min_width=240)
-                gr.Markdown("No PDFs handy? The sample has a report and a shift log.")
+            with gr.Row(elem_classes="sample-row"):
+                sample_btn = gr.Button("Use sample incident PDFs", size="md", scale=0, min_width=220)
+                gr.Markdown("No PDFs handy? The sample has a report and a shift log.", elem_classes="sample-note")
             use_sample = gr.Checkbox(label=f"Include the sample incident: {SAMPLE_FILES}", value=False)
             gr.Markdown("<small>Add your own PDFs, tick the sample, or both. Then start the chat.</small>")
             start_btn = gr.Button("Start chat", variant="primary")

@@ -92,15 +92,32 @@ def _best_sentences(text: str, q: set[str], max_sentences: int = 2) -> list[str]
 
 
 _TIMESTAMPED = re.compile(r"^\d{1,2}:\d{2}\b")
+_HAS_TIME = re.compile(r"\b\d{1,2}:\d{2}\b")
+
+
+def timestamped_events(chunks: list[Chunk]) -> list[tuple[str, Chunk]]:
+    """Sentences that mention a clock time, in document order.
+
+    Shift logs put the time first ("02:10 job aborted"), so those lines are preferred.
+    Reports usually mention times mid-sentence ("failover at 14:05"), so when there are
+    fewer than two log-style lines, any sentence containing a time is used instead."""
+
+    def collect(pattern: re.Pattern) -> list[tuple[str, Chunk]]:
+        events: list[tuple[str, Chunk]] = []
+        seen: set[str] = set()
+        for c in chunks:
+            for s in split_sentences(c.text):
+                if pattern.search(s) and not is_heading(s) and s not in seen:
+                    seen.add(s)
+                    events.append((s, c))
+        return events
+
+    log_lines = collect(_TIMESTAMPED)
+    return log_lines if len(log_lines) >= 2 else collect(_HAS_TIME)
 
 
 def _timeline(chunks: list[Chunk], limit: int = 12) -> Answer | None:
-    """Collect log lines that start with a clock time, in document order."""
-    events: list[tuple[str, Chunk]] = []
-    for c in chunks:
-        for s in split_sentences(c.text):
-            if _TIMESTAMPED.match(s) and all(s != e for e, _ in events):
-                events.append((s, c))
+    events = timestamped_events(chunks)
     if len(events) < 2:
         return None
     events = events[:limit]
@@ -183,11 +200,27 @@ def _best_sentence(chunks: list[Chunk], words: list[str], exclude: tuple = ()) -
     return best
 
 
+def _heuristic_status(chunks: list[Chunk]) -> str:
+    sentence = _best_sentence(chunks, ["resolved", "completed", "restored", "fixed", "closed", "released"])
+    if not sentence:
+        return "Unknown"
+    time = re.search(r"\b\d{1,2}:\d{2}\b", sentence)
+    if not time:
+        return sentence
+    words = set(tokenize(sentence))
+    if words & {"resolv", "restor", "fix", "clos"}:
+        label = "Resolved"
+    elif "complet" in words:
+        label = "Completed"
+    else:
+        label = "Released"
+    return f"{label} at {time.group()}"
+
+
 def heuristic_summary(chunks: list[Chunk]) -> dict:
     all_tokens = set()
     for c in chunks:
         all_tokens.update(tokenize(c.text))
-    status = _best_sentence(chunks, ["resolved", "completed", "restored", "closed", "released"])
     missing = [msg for words, msg in _CHECKS if not all_tokens & set(tokenize(" ".join(words)))]
     what = _best_sentence(chunks, ["incident", "failed", "failure", "outage", "error", "delayed"])
     impact = _best_sentence(
@@ -196,7 +229,7 @@ def heuristic_summary(chunks: list[Chunk]) -> dict:
     return {
         "what_happened": what or "Not stated in the PDFs.",
         "impact": impact or "Not stated in the PDFs.",
-        "status": status or "Unknown",
+        "status": _heuristic_status(chunks),
         "missing": missing or ["Nothing obvious; add an AI key for a deeper gap check."],
         "mode": "extractive",
     }
@@ -225,15 +258,26 @@ async def summarize(chunks: list[Chunk], llm: LLMClient, max_chars: int = 14000)
         data = await llm.chat_json(SUMMARY_SYSTEM, "\n".join(parts))
     except LLMError as exc:
         log.warning("Summary via LLM failed: %s", exc)
-        return heuristic_summary(chunks)
+        fallback = heuristic_summary(chunks)
+        missing = fallback["missing"]
+        if missing == ["Nothing obvious; add an AI key for a deeper gap check."]:
+            missing = []
+        fallback["missing"] = (missing + [f"AI check unavailable: {exc}"])[:3]
+        return fallback
 
     missing = data.get("missing") or []
     if isinstance(missing, str):
         missing = [missing]
+    impact = str(data.get("impact") or "Not stated in the PDFs.")
+    status = str(data.get("status") or "Unknown")
+    normalised_status = re.sub(r"[\W_]+", " ", status.casefold()).strip()
+    normalised_impact = re.sub(r"[\W_]+", " ", impact.casefold()).strip()
+    if normalised_status == normalised_impact:
+        status = _heuristic_status(chunks)
     return {
         "what_happened": str(data.get("what_happened") or "Not stated in the PDFs."),
-        "impact": str(data.get("impact") or "Not stated in the PDFs."),
-        "status": str(data.get("status") or "Unknown"),
+        "impact": impact,
+        "status": status,
         "missing": [str(m) for m in missing][:3],
         "mode": "llm",
     }

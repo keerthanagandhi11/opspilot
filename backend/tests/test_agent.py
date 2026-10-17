@@ -176,3 +176,13 @@ def test_registry_ids_are_stable_per_page():
     assert reg.add("a.pdf", 1, "x") == reg.add("a.pdf", 1, "longer text") == "S1"
     assert reg.add("a.pdf", 2, "y") == "S2"
     assert reg.source("S1").snippet == "longer text"
+
+
+def test_rate_limit_skips_straight_to_quote_mode(sample_session):
+    from app.llm import RATE_LIMIT_MESSAGE, RateLimitError
+
+    llm = ScriptedLLM([RateLimitError(RATE_LIMIT_MESSAGE)])
+    ans = asyncio.run(ask_once("Who approved the rerun?", sample_session, llm, SETTINGS))
+    assert ans.mode == "extractive" and "shift lead" in ans.text
+    assert ans.notice == RATE_LIMIT_MESSAGE
+    assert len(llm.calls) == 1  # no second LLM call after the limit

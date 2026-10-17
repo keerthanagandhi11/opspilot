@@ -31,3 +31,35 @@ def test_windows_overlap_and_cover_text():
     assert len(parts) > 1
     assert all(len(p) <= 300 for p in parts)
     assert parts[-1].endswith("word399.")
+
+
+def _encrypted_pdf(user_password: str, algorithm: str) -> bytes:
+    import io
+    from pathlib import Path
+
+    from pypdf import PdfReader, PdfWriter
+
+    src = Path(__file__).resolve().parent.parent / "app" / "sample_data" / "incident_report_INC-1042.pdf"
+    w = PdfWriter()
+    for p in PdfReader(src).pages:
+        w.add_page(p)
+    w.encrypt(user_password=user_password, owner_password="owner", algorithm=algorithm)
+    buf = io.BytesIO()
+    w.write(buf)
+    return buf.getvalue()
+
+
+def test_restricted_aes_pdf_opens_without_password():
+    from app.pdf_parser import parse_pdf
+
+    doc = parse_pdf("r.pdf", _encrypted_pdf("", "AES-256"), 300)
+    assert doc.page_count == 3 and "nightly_batch_07" in doc.pages[0]
+
+
+def test_password_protected_pdf_has_clear_error():
+    import pytest
+
+    from app.pdf_parser import PdfError, parse_pdf
+
+    with pytest.raises(PdfError, match="password protected"):
+        parse_pdf("locked.pdf", _encrypted_pdf("secret", "AES-256"), 300)

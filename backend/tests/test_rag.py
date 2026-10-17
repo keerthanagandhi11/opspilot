@@ -8,6 +8,7 @@ class FakeLLM:
     def __init__(self, reply=None, error=False, data=None):
         self.reply, self.error, self.data = reply, error, data
         self.prompts = []
+        self.max_tokens = []
 
     enabled = True
 
@@ -17,7 +18,8 @@ class FakeLLM:
             raise LLMError("boom")
         return self.reply
 
-    async def chat_json(self, system, user):
+    async def chat_json(self, system, user, max_tokens=None):
+        self.max_tokens.append(max_tokens)
         if self.error:
             raise LLMError("boom")
         return self.data
@@ -87,6 +89,7 @@ def test_heuristic_summary_flags_missing_owner(sample_index):
     s = heuristic_summary(chunks)
     assert "nightly_batch_07" in s["what_happened"]
     assert "No on-call owner is named." in s["missing"]
+    assert s["status"] == "Completed at 03:40"
 
 
 def test_llm_summary_normalises_fields(sample_index):
@@ -96,8 +99,36 @@ def test_llm_summary_normalises_fields(sample_index):
     assert s == {"what_happened": "x", "impact": "y", "status": "Resolved", "missing": ["z"], "mode": "llm"}
 
 
+def test_llm_summary_does_not_repeat_impact_as_status(sample_index):
+    chunks, _ = sample_index
+    llm = FakeLLM(data={"what_happened": "x", "impact": "Same text", "status": " same TEXT ", "missing": []})
+    summary = run(summarize(chunks, llm))
+    assert summary["status"] == "Completed at 03:40"
+    assert summary["status"] != summary["impact"]
+
+
+def test_llm_summary_failure_explains_ai_check_is_unavailable(sample_index):
+    chunks, _ = sample_index
+    summary = run(summarize(chunks, FakeLLM(error=True)))
+    assert summary["mode"] == "extractive"
+    assert summary["missing"] == ["No on-call owner is named.", "AI check unavailable: boom"]
+
+
 def test_answers_skip_page_headings(sample_index):
     _, index = sample_index
     a = run(answer_question("Why did the job fail?", index, NoLLM(), 5))
     assert "Root Cause Analysis" not in a.text
     assert a.text.startswith("Root cause: the upstream feed was delivered at 02:55")
+
+
+def test_timeline_uses_mid_sentence_times_when_no_log_lines():
+    from app.chunking import Chunk
+    from app.retrieval import Index
+
+    chunks = [
+        Chunk(0, "r.pdf", 1, "Incident INC-2001: database failover at 14:05. On-call engineer paged at 14:07."),
+        Chunk(1, "r.pdf", 2, "14:30 failover completed and service restored."),
+    ]
+    a = run(answer_question("Give me a timeline", Index(chunks, False, ""), NoLLM(), 5))
+    assert a.text.index("14:05") < a.text.index("14:07") < a.text.index("14:30")
+    assert [s.page for s in a.sources] == [1, 2]

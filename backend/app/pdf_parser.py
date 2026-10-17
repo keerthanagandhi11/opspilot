@@ -47,10 +47,14 @@ def parse_pdf(name: str, data: bytes, max_pages: int) -> ParsedPdf:
     try:
         reader = PdfReader(io.BytesIO(data))
         if reader.is_encrypted:
+            # Many PDFs are encrypted only to restrict printing/copying and open with an
+            # empty password. decrypt() returns 0 (not an exception) when a password is needed.
             try:
-                reader.decrypt("")
+                opened = reader.decrypt("")
             except Exception as exc:  # noqa: BLE001
-                raise PdfError(f"{name} is password protected.") from exc
+                raise PdfError(f"{name} is encrypted in a way that can't be opened.") from exc
+            if not opened:
+                raise PdfError(f"{name} is password protected. Remove the password and upload it again.")
         if len(reader.pages) > max_pages:
             raise PdfError(f"{name} has {len(reader.pages)} pages; the limit is {max_pages}.")
         pages = []
